@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "PlusJakartaSans";
+  src: url("../Fonts/PlusJakartaSans-Regular.ttf") format("truetype");
+}
+
+@theme {
+  --font-jakarta: "PlusJakartaSans", sans-serif; 
+}
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-33.333%); }
+}
+
+@layer utilities {
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+}
+
+
+body {
+  background-color: white;
+}
+
+.global-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(6px);
+  color: #111827;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.global-loader__spinner {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #dc2626;
+  animation: global-loader-spin 0.9s linear infinite;
+}
+
+@keyframes global-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+button,
+a,
+[role="button"],
+[onclick],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+.clickable {
+  cursor: pointer;
+}
+
+
+button:hover,
+a:hover,
+[role="button"]:hover {
+  cursor: pointer;
+}
+
+
+button:disabled,
+input:disabled,
+select:disabled,
+[disabled] {
+  cursor: not-allowed;
+}
