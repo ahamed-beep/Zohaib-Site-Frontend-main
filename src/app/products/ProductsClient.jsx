@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, startTransition, useCallback } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -17,13 +17,10 @@ import {
 
 export default function ProductsClient({ initialProducts, brands, categoryGroups }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const activeGroup = searchParams.get("group") || "All";
-  const activeCategory = searchParams.get("category") || "All";
-  const activeBrand = searchParams.get("brand") || "All";
-
+  
+  const [selectedGroup, setSelectedGroup] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedBrand, setSelectedBrand] = useState("All");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -35,53 +32,47 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
   const [sortBy, setSortBy] = useState("default");
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Adjusted from 12 to 6 products per page as requested
-  const itemsPerPage = 6;
+  const itemsPerPage = 12;
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      startTransition(() => setDebouncedSearch(search));
+      setDebouncedSearch(search);
     }, 180);
     return () => clearTimeout(handler);
   }, [search]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeGroup, activeCategory, activeBrand, debouncedSearch]);
+  }, [selectedGroup, selectedCategory, selectedBrand, debouncedSearch]);
+
+  useEffect(() => {
+    if (window.location.search) {
+      router.replace(window.location.pathname, { scroll: false });
+    }
+  }, [router]);
 
   const toggleGroup = (group) => {
     setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
   };
 
-  const updateURLParams = useCallback(
-    (paramsObject) => {
-      const params = new URLSearchParams(searchParams.toString());
-      Object.entries(paramsObject).forEach(([key, value]) => {
-        if (value === "All") {
-          params.delete(key);
-        } else {
-          params.set(key, value);
-        }
-      });
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
-    },
-    [searchParams, router, pathname]
-  );
-
-  const clearAll = useCallback(() => {
+  const clearAll = () => {
+    setSelectedGroup("All");
+    setSelectedCategory("All");
+    setSelectedBrand("All");
     setSearch("");
+    setDebouncedSearch("");
     setMobileFiltersOpen(false);
-    router.push(pathname, { scroll: false });
-  }, [router, pathname]);
+    setCurrentPage(1);
+  };
 
   const getCategoryCount = (group, category) =>
     initialProducts.filter((p) => p.group === group && p.category === category).length;
 
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = initialProducts.filter((product) => {
-      const brandMatch = activeBrand === "All" || product.brand === activeBrand;
-      const groupMatch = activeGroup === "All" || product.group === activeGroup;
-      const categoryMatch = activeCategory === "All" || product.category === activeCategory;
+      const brandMatch = selectedBrand === "All" || product.brand === selectedBrand;
+      const groupMatch = selectedGroup === "All" || product.group === selectedGroup;
+      const categoryMatch = selectedCategory === "All" || product.category === selectedCategory;
       if (!brandMatch || !groupMatch || !categoryMatch) return false;
       if (!debouncedSearch) return true;
       const q = debouncedSearch.toLowerCase();
@@ -96,7 +87,7 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
     else if (sortBy === "price-desc") filtered = [...filtered].sort((b, a) => b.price - a.price);
 
     return filtered;
-  }, [activeBrand, activeGroup, activeCategory, debouncedSearch, sortBy, initialProducts]);
+  }, [selectedBrand, selectedGroup, selectedCategory, debouncedSearch, sortBy, initialProducts]);
 
   const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
   const paginatedProducts = useMemo(() => {
@@ -105,7 +96,7 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
   }, [filteredAndSortedProducts, currentPage]);
 
   const hasActiveFilters =
-    activeBrand !== "All" || activeGroup !== "All" || activeCategory !== "All" || search;
+    selectedBrand !== "All" || selectedGroup !== "All" || selectedCategory !== "All" || search;
 
   const FilterSidebarContent = () => (
     <div className="space-y-6">
@@ -122,14 +113,16 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
                 type="button"
                 onClick={() => {
                   toggleGroup(group);
-                  if (activeGroup === group && activeCategory === "All") {
-                    updateURLParams({ group: "All", category: "All" });
+                  if (selectedGroup === group && selectedCategory === "All") {
+                    setSelectedGroup("All");
+                    setSelectedCategory("All");
                   } else {
-                    updateURLParams({ group, category: "All" });
+                    setSelectedGroup(group);
+                    setSelectedCategory("All");
                   }
                 }}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 transition-colors text-left ${
-                  activeGroup === group && activeCategory === "All"
+                  selectedGroup === group && selectedCategory === "All"
                     ? "bg-zinc-900 text-white"
                     : "bg-zinc-50 hover:bg-zinc-100 text-zinc-800"
                 }`}
@@ -141,15 +134,19 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
               {expandedGroups[group] && (
                 <div className="p-1 space-y-0.5 border-t border-zinc-100 bg-white">
                   {categoryGroups[group].map((cat) => {
-                    const isSelected = activeGroup === group && activeCategory === cat;
+                    const isSelected = selectedGroup === group && selectedCategory === cat;
                     return (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => {
-                          isSelected
-                            ? updateURLParams({ group, category: "All" })
-                            : updateURLParams({ group, category: cat });
+                          if (isSelected) {
+                            setSelectedGroup(group);
+                            setSelectedCategory("All");
+                          } else {
+                            setSelectedGroup(group);
+                            setSelectedCategory(cat);
+                          }
                           setMobileFiltersOpen(false);
                         }}
                         className={`w-full text-left px-2.5 py-1.5 transition-all duration-200 text-xs flex justify-between items-center rounded-sm ${
@@ -176,19 +173,19 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
         <div className="pt-4 border-t border-zinc-200">
           <p className="text-xs text-zinc-400 mb-2 tracking-wider uppercase font-medium">Active Filters</p>
           <div className="flex flex-wrap gap-1.5">
-            {activeBrand !== "All" && (
+            {selectedBrand !== "All" && (
               <span className="text-[10px] bg-zinc-100 px-2 py-1 text-zinc-700 font-medium rounded-sm">
-                Brand: {activeBrand}
+                Brand: {selectedBrand}
               </span>
             )}
-            {activeGroup !== "All" && (
+            {selectedGroup !== "All" && (
               <span className="text-[10px] bg-zinc-100 px-2 py-1 text-zinc-700 font-medium rounded-sm">
-                Type: {activeGroup}
+                Type: {selectedGroup}
               </span>
             )}
-            {activeCategory !== "All" && (
+            {selectedCategory !== "All" && (
               <span className="text-[10px] bg-zinc-100 px-2 py-1 text-zinc-700 font-medium rounded-sm">
-                Category: {activeCategory}
+                Category: {selectedCategory}
               </span>
             )}
             {search && (
@@ -211,7 +208,6 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
 
   return (
     <>
-      {/* Mobile Filter Drawer */}
       {mobileFiltersOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
@@ -235,11 +231,9 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
         </div>
       )}
 
-      {/* Fluid Layout Shell */}
       <div className="max-w-[1440px] 2xl:max-w-[1920px] 3xl:max-w-[2560px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 md:py-6">
         <div className="flex flex-col lg:flex-row gap-4 xl:gap-6">
           
-          {/* Desktop Filter Sidebar */}
           <aside
             aria-label="Product filters"
             className="hidden lg:block lg:w-64 xl:w-72 shrink-0 sticky top-4 h-[calc(100vh-32px)] overflow-y-auto pb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -247,11 +241,9 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
             <FilterSidebarContent />
           </aside>
 
-          {/* Main Workspace */}
           <main className="flex-1">
             <div className="bg-white pb-3 mb-4 border-b border-zinc-100 space-y-3">
               
-              {/* Search Matrix Panel */}
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1 w-full">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
@@ -268,8 +260,8 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
                 <div className="flex gap-1.5 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-48 sm:flex-none">
                     <select
-                      value={activeBrand}
-                      onChange={(e) => updateURLParams({ brand: e.target.value })}
+                      value={selectedBrand}
+                      onChange={(e) => setSelectedBrand(e.target.value)}
                       aria-label="Filter by brand"
                       className="w-full appearance-none bg-white border border-zinc-200 py-2 pl-3 pr-8 text-xs text-zinc-700 focus:outline-none focus:border-black cursor-pointer rounded-sm"
                     >
@@ -292,7 +284,6 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
                 </div>
               </div>
 
-              {/* Utility Panel */}
               <div className="flex items-center justify-between pt-0.5 gap-2">
                 <p className="text-[10px] text-zinc-400 tracking-wider uppercase font-medium truncate min-h-[14px]">
                   Showing {filteredAndSortedProducts.length} products
@@ -337,7 +328,6 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
               </div>
             </div>
 
-            {/* Catalog Grid Streamlined */}
             {filteredAndSortedProducts.length > 0 ? (
               viewMode === "grid" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 gap-x-4 gap-y-6">
@@ -459,7 +449,6 @@ export default function ProductsClient({ initialProducts, brands, categoryGroups
               </div>
             )}
 
-            {/* Pagination System */}
             {filteredAndSortedProducts.length > 0 && totalPages > 1 && (
               <nav
                 aria-label="Product pagination"
